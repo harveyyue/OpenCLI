@@ -75,6 +75,7 @@ function getTranscriptLinesScript() {
         'PPT 生成',
         '图像生成',
         '帮我写作',
+        '下载电脑版',
       ]);
 
       const noisyPatterns = [
@@ -84,6 +85,7 @@ function getTranscriptLinesScript() {
         /^在此处拖放文件/,
         /^文件数量：/,
         /^文件类型：/,
+        /^(AI 创作|云盘|更多|历史对话|手机版对话|豆包|新对话|快速|超能模式|Beta|PPT 生成|图像生成|帮我写作|内容由豆包 AI 生成|下载电脑版|\\s)+$/,
       ];
 
       const transcriptText = clean(root.innerText || root.textContent || '')
@@ -662,14 +664,20 @@ export async function waitForDoubaoResponse(page, beforeLines, beforeTurns, prom
     const beforeTurnSet = new Set(beforeTurns
         .filter((turn) => turn.Role === 'Assistant')
         .map((turn) => `${turn.Role}::${turn.Text}`));
-    const sanitizeCandidate = (value) => value
-        .replace(promptText, '')
-        .replace(/内容由豆包 AI 生成/g, '')
-        .replace(/在此处拖放文件/g, '')
-        .replace(/文件数量：.*$/g, '')
-        .replace(/\{"namedChunks".*$/g, '')
-        .replace(/window\\._SSR_DATA.*$/g, '')
-        .trim();
+    const uiChromeNoise = /(下载电脑版|AI 创作|手机版对话|超能模式|PPT 生成|内容由豆包 AI 生成)/g;
+    const pureNoisePattern = /^(AI 创作|云盘|更多|历史对话|手机版对话|豆包|新对话|快速|超能模式|Beta|PPT 生成|图像生成|帮我写作|下载电脑版|内容由豆包 AI 生成|\s)+$/;
+    const sanitizeCandidate = (value) => {
+        const cleaned = value
+            .replace(promptText, '')
+            .replace(/内容由豆包 AI 生成/g, '')
+            .replace(/在此处拖放文件/g, '')
+            .replace(/文件数量：.*$/g, '')
+            .replace(/\{"namedChunks".*$/g, '')
+            .replace(/window\\._SSR_DATA.*$/g, '')
+            .trim();
+        if (pureNoisePattern.test(cleaned)) return '';
+        return cleaned.replace(uiChromeNoise, '').trim();
+    };
     const getCandidate = async () => {
         const verification = await page.evaluate(detectDoubaoVerificationScript());
         if (verification?.detected) {
